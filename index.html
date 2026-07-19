@@ -1,0 +1,569 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Second Brain — Fast Capture</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://cdn.jsdelivr.net/npm/fontsource-inter@4.5.15/index.css" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; color: #e2e8f0; padding-bottom: 40px; }
+  .header { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(148, 163, 184, 0.1); padding: 16px 24px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .logo-text h1 { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+  .logo-text p { font-size: 11px; color: #94a3b8; }
+  
+  /* Tombol Dashboard di pojok kanan atas */
+  .dashboard-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px;
+    color: #c4b5fd; font-size: 13px; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .dashboard-btn:hover { background: rgba(139, 92, 246, 0.25); border-color: rgba(139, 92, 246, 0.5); transform: translateY(-1px); }
+  .dashboard-btn .icon { font-size: 16px; }
+
+  .container { max-width: 800px; margin: 32px auto; padding: 0 20px; }
+  .hero { text-align: center; margin-bottom: 32px; }
+  .hero h2 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .hero p { color: #94a3b8; font-size: 14px; }
+
+  .status-banner { padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+  .status-banner.connecting { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; }
+  .status-banner.error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; }
+  .status-banner.success { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); color: #86efac; }
+
+  .card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px; }
+  .form-group input[type="text"], .form-group textarea, .form-group input[type="date"], .form-group input[type="time"], .form-group select {
+    width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px;
+    color: #e2e8f0; font-size: 14px; transition: all 0.2s;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: #8b5cf6; background: rgba(15, 23, 42, 0.9); }
+  .form-group textarea { resize: vertical; min-height: 100px; }
+
+  .categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .category-chip { padding: 6px 12px; background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+  .category-chip.active { background: linear-gradient(135deg, #8b5cf6, #ec4899); border-color: transparent; color: white; }
+
+  .tags-input { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; min-height: 42px; }
+  .tag-chip { padding: 4px 10px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .tag-chip button { background: none; border: none; color: #cbd5e1; cursor: pointer; font-size: 14px; }
+  .tags-input input { flex: 1; min-width: 100px; background: none; border: none; color: #e2e8f0; font-size: 13px; outline: none; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: rgba(15, 23, 42, 0.4); border-radius: 8px; margin-bottom: 10px; }
+  .toggle-row label { font-size: 13px; font-weight: 600; color: #cbd5e1; margin: 0; }
+  .switch { position: relative; width: 42px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: rgba(148, 163, 184, 0.3); border-radius: 24px; cursor: pointer; transition: 0.3s; }
+  .slider:before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+  input:checked + .slider { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
+  input:checked + .slider:before { transform: translateX(18px); }
+
+  .photo-upload { border: 2px dashed rgba(148, 163, 184, 0.3); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .photo-upload:hover { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.05); }
+  .photo-upload.has-photo { border-style: solid; border-color: #22c55e; }
+  .photo-preview { max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 10px; }
+
+  .btn-primary { width: 100%; padding: 14px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border: none; border-radius: 10px; color: white; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .saved-notes { margin-top: 32px; }
+  .note-item { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 12px; padding: 16px; margin-bottom: 12px; transition: all 0.2s; }
+  .note-item:hover { border-color: rgba(139, 92, 246, 0.3); }
+  .note-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px; }
+  .note-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+  .note-time { font-size: 11px; color: #94a3b8; }
+  .note-body { font-size: 13px; color: #cbd5e1; line-height: 1.5; margin-bottom: 10px; white-space: pre-wrap; }
+  .note-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+  .meta-chip { padding: 3px 8px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 10px; font-size: 11px; color: #c4b5fd; }
+
+  .filter-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-tab { padding: 6px 12px; background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+  .filter-tab.active { background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c4b5fd; }
+
+  .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 640px) {
+    .hero h2 { font-size: 22px; }
+    .header { padding: 12px 16px; }
+    .logo-text h1 { font-size: 15px; }
+    .logo-text p { font-size: 10px; }
+    .dashboard-btn { padding: 6px 10px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🧠</div>
+    <div class="logo-text">
+      <h1>Second Brain</h1>
+      <p>Fast Capture — Tangkap ide & tugas dalam hitungan detik</p>
+    </div>
+  </div>
+  <!-- Tombol kecil di pojok kanan atas menuju Dashboard -->
+  <a href="dashboard.html" class="dashboard-btn" title="Buka Command Center">
+    <span class="icon">🎯</span>
+    <span>Dashboard</span>
+  </a>
+</header>
+
+<div class="container">
+  <div class="hero">
+    <h2>📝 Catatan Cepat BARU</h2>
+    <p>Tangkap apa pun yang ada di pikiran Anda</p>
+  </div>
+
+  <div id="statusBanner" class="status-banner connecting">
+    <span>⏳</span>
+    <span>Menghubungkan ke Supabase...</span>
+  </div>
+
+  <div id="setupError" class="card hidden">
+    <div class="card-title">⚠️ Setup Diperlukan</div>
+    <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
+      Supabase belum dikonfigurasi. Silakan buka <a href="dashboard.html" style="color: #a78bfa;">Dashboard</a> untuk setup koneksi terlebih dahulu.
+    </p>
+  </div>
+
+  <form id="captureForm" class="card hidden">
+    <div class="form-group">
+      <label>Isi Catatan</label>
+      <textarea id="content" placeholder="Tuliskan detailnya di sini..." required></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>📷 Foto (Opsional)</label>
+      <div class="photo-upload" id="photoUpload">
+        <div id="uploadPlaceholder">
+          <div style="font-size: 32px; margin-bottom: 8px;">📤</div>
+          <div style="font-size: 13px; color: #94a3b8;">Klik untuk upload foto atau drag & drop (max 2MB)</div>
+        </div>
+        <img id="photoPreview" class="photo-preview hidden" />
+        <input type="file" id="photoInput" accept="image/*" style="display:none" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>🏷️ Kategori</label>
+      <div class="categories" id="categoriesList"></div>
+    </div>
+
+    <div class="form-group">
+      <label># Tag (klik untuk memilih, bisa lebih dari satu)</label>
+      <div class="categories" id="tagsList"></div>
+    </div>
+
+    <div class="toggle-row">
+      <label>✅ Masukkan ke To-Do List?</label>
+      <label class="switch">
+        <input type="checkbox" id="isTodo" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div id="todoOptions" class="hidden" style="padding: 12px; background: rgba(139, 92, 246, 0.05); border-radius: 8px; margin-bottom: 12px;">
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>📝 Daftar Tugas (Checklist)</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <input type="text" id="todoItemInput" placeholder="Tulis daftar tugas lalu klik Tambah..." style="flex: 1;" />
+          <button type="button" id="addTodoItemBtn" style="width: auto; padding: 10px 16px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 700; cursor: pointer;">+ Tambah</button>
+        </div>
+        <div id="todoItemsList" style="display: flex; flex-direction: column; gap: 6px;"></div>
+      </div>
+
+      <div class="toggle-row" style="background: transparent; padding: 8px 0;">
+        <label>⏰ Aktifkan Penjadwalan & Reminder</label>
+        <label class="switch">
+          <input type="checkbox" id="hasSchedule" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div id="scheduleOptions" class="hidden">
+        <div class="form-group">
+          <label>📅 Tanggal</label>
+          <input type="date" id="scheduleDate" />
+        </div>
+        <div class="form-group">
+          <label>🕐 Jam</label>
+          <input type="time" id="scheduleTime" />
+        </div>
+        <div class="form-group">
+          <label>🔔 Reminder Otomatis</label>
+          <select id="reminderType">
+            <option value="">— Tidak Ada —</option>
+            <option value="15min">15 Menit Sebelumnya</option>
+            <option value="1hour">1 Jam Sebelumnya</option>
+            <option value="1day">1 Hari Sebelumnya</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>⚡ Prioritas</label>
+          <select id="prioritySelect">
+            <option value="normal">Normal</option>
+            <option value="important">🟠 Penting</option>
+            <option value="urgent">🔴 Mendesak</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>👤 PIC (Penanggung Jawab)</label>
+        <select id="picSelect">
+          <option value="">— Pilih PIC —</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-primary" id="submitBtn">💾 Simpan Catatan</button>
+  </form>
+
+  <div class="saved-notes">
+    <div class="card">
+      <div class="card-title">📚 Catatan Tersimpan <span id="noteCount" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: auto;">0 catatan</span></div>
+      <div class="filter-tabs">
+        <div class="filter-tab active" data-filter="all">Semua</div>
+        <div class="filter-tab" data-filter="todo">To-Do</div>
+        <div class="filter-tab" data-filter="scheduled">Dijadwalkan</div>
+      </div>
+      <div id="notesList">
+        <div style="text-align: center; padding: 40px; color: #64748b;">
+          <div style="font-size: 40px; margin-bottom: 8px;">📭</div>
+          <div>Memuat catatan...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Built with ❤️ — Second Brain v1.0 • Powered by Supabase</div>
+
+<script>
+  let supabaseClient = null;
+  let currentCategory = null;
+  let currentTags = [];
+  let currentPhotoData = null;
+  let currentFilter = 'all';
+
+  const statusBanner = document.getElementById('statusBanner');
+  const setupError = document.getElementById('setupError');
+  const captureForm = document.getElementById('captureForm');
+
+  function setStatus(type, message) {
+    statusBanner.className = 'status-banner ' + type;
+    const icon = type === 'success' ? '✅' : type === 'error' ? '⚠️' : '⏳';
+    statusBanner.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  }
+
+  async function initSupabase() {
+    const url = localStorage.getItem('supabase_url');
+    const key = localStorage.getItem('supabase_anon_key');
+
+    if (!url || !key) {
+      setStatus('error', 'Supabase belum dikonfigurasi. Buka Dashboard untuk setup.');
+      setupError.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      supabaseClient = window.supabase.createClient(url, key);
+      const { error } = await supabaseClient.from('fast_captures').select('id').limit(1);
+      if (error) throw error;
+      setStatus('success', 'Terhubung ke Supabase ✓');
+      captureForm.classList.remove('hidden');
+      await loadCategories();
+      await loadTags();
+      await loadPics();
+      await loadNotes();
+    } catch (err) {
+      console.error(err);
+      setStatus('error', 'Gagal terhubung: ' + err.message);
+      setupError.classList.remove('hidden');
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const { data } = await supabaseClient.from('categories').select('name').order('name');
+      const list = document.getElementById('categoriesList');
+      const categories = (data && data.length) ? data.map(c => c.name) : ['Pribadi', 'Kerja', 'Ide', 'Belajar', 'Keuangan', 'Kesehatan'];
+      list.innerHTML = categories.map(c => `<div class="category-chip" data-cat="${c}">${c}</div>`).join('');
+      list.querySelectorAll('.category-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          list.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+          if (currentCategory === chip.dataset.cat) {
+            currentCategory = null;
+          } else {
+            chip.classList.add('active');
+            currentCategory = chip.dataset.cat;
+          }
+        });
+      });
+    } catch (err) {
+      console.error('Load categories error:', err);
+    }
+  }
+
+  async function loadPics() {
+    try {
+      const { data } = await supabaseClient.from('pics').select('name').order('name');
+      const select = document.getElementById('picSelect');
+      select.innerHTML = '<option value="">— Pilih PIC —</option>';
+      if (data && data.length) {
+        data.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.name;
+          opt.textContent = p.name;
+          select.appendChild(opt);
+        });
+      }
+    } catch (err) {
+      console.error('Load pics error:', err);
+    }
+  }
+
+  async function loadTags() {
+    try {
+      const { data } = await supabaseClient.from('tags').select('name').order('name');
+      const list = document.getElementById('tagsList');
+      const tagsAvail = (data && data.length) ? data.map(t => t.name) : ['Penting', 'Mendesak', 'Ide', 'Rutin'];
+      list.innerHTML = tagsAvail.map(t => `<div class="category-chip" data-tag="${t}">#${t}</div>`).join('');
+      list.querySelectorAll('.category-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const t = chip.dataset.tag;
+          if (currentTags.includes(t)) {
+            currentTags = currentTags.filter(x => x !== t);
+            chip.classList.remove('active');
+          } else {
+            currentTags.push(t);
+            chip.classList.add('active');
+          }
+        });
+      });
+    } catch (err) {
+      console.error('Load tags error:', err);
+    }
+  }
+
+  // To-Do checklist items
+  let currentTodoItems = [];
+  const todoItemInput = document.getElementById('todoItemInput');
+  const todoItemsList = document.getElementById('todoItemsList');
+
+  function addTodoItem() {
+    const val = todoItemInput.value.trim();
+    if (!val) return;
+    currentTodoItems.push({ text: val, done: false });
+    todoItemInput.value = '';
+    renderTodoItems();
+    todoItemInput.focus();
+  }
+
+  document.getElementById('addTodoItemBtn').addEventListener('click', addTodoItem);
+  todoItemInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTodoItem(); }
+  });
+
+  function renderTodoItems() {
+    todoItemsList.innerHTML = currentTodoItems.map((item, i) => `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: rgba(15, 23, 42, 0.5); border-radius: 8px;">
+        <span style="font-size: 13px; color: #e2e8f0;">${escapeHtml(item.text)}</span>
+        <button type="button" onclick="removeTodoItem(${i})" style="background: none; border: none; color: #fca5a5; cursor: pointer; font-size: 15px;">×</button>
+      </div>
+    `).join('');
+  }
+  window.removeTodoItem = (i) => { currentTodoItems.splice(i, 1); renderTodoItems(); };
+
+  // Photo upload
+  const photoUpload = document.getElementById('photoUpload');
+  const photoInput = document.getElementById('photoInput');
+  const photoPreview = document.getElementById('photoPreview');
+  const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+
+  photoUpload.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', (e) => handlePhoto(e.target.files[0]));
+  photoUpload.addEventListener('dragover', (e) => { e.preventDefault(); photoUpload.style.borderColor = '#8b5cf6'; });
+  photoUpload.addEventListener('dragleave', () => { photoUpload.style.borderColor = ''; });
+  photoUpload.addEventListener('drop', (e) => {
+    e.preventDefault();
+    photoUpload.style.borderColor = '';
+    if (e.dataTransfer.files[0]) handlePhoto(e.dataTransfer.files[0]);
+  });
+
+  function handlePhoto(file) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('Foto maksimal 2MB'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      currentPhotoData = e.target.result;
+      photoPreview.src = currentPhotoData;
+      photoPreview.classList.remove('hidden');
+      uploadPlaceholder.classList.add('hidden');
+      photoUpload.classList.add('has-photo');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Toggle options
+  document.getElementById('isTodo').addEventListener('change', (e) => {
+    document.getElementById('todoOptions').classList.toggle('hidden', !e.target.checked);
+  });
+  document.getElementById('hasSchedule').addEventListener('change', (e) => {
+    document.getElementById('scheduleOptions').classList.toggle('hidden', !e.target.checked);
+  });
+
+  // Submit form
+  document.getElementById('captureForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Menyimpan...';
+
+    const content = document.getElementById('content').value.trim();
+    const title = content.length > 60 ? content.slice(0, 60).trim() + '…' : (content || 'Catatan tanpa judul');
+    const isTodo = document.getElementById('isTodo').checked;
+    const hasSchedule = document.getElementById('hasSchedule').checked;
+    const scheduleDate = document.getElementById('scheduleDate').value;
+    const scheduleTime = document.getElementById('scheduleTime').value;
+    const reminderType = document.getElementById('reminderType').value;
+    const priority = document.getElementById('prioritySelect').value || 'normal';
+    const pic = document.getElementById('picSelect').value;
+
+    let scheduledAt = null;
+    if (hasSchedule && scheduleDate) {
+      scheduledAt = scheduleTime ? `${scheduleDate}T${scheduleTime}:00` : `${scheduleDate}T00:00:00`;
+    }
+
+    const payload = {
+      title,
+      content,
+      category: currentCategory,
+      tags: currentTags,
+      photo: currentPhotoData,
+      is_todo: isTodo,
+      todo_completed: false,
+      todo_items: isTodo ? currentTodoItems : [],
+      priority,
+      has_schedule: hasSchedule,
+      scheduled_at: scheduledAt,
+      reminder_type: reminderType || null,
+      pic: pic || null,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const { error } = await supabaseClient.from('fast_captures').insert([payload]);
+      if (error) throw error;
+
+      // Log activity
+      try {
+        await supabaseClient.from('activities').insert([{
+          type: 'capture',
+          title: `Catatan baru: ${title}`,
+          created_at: new Date().toISOString()
+        }]);
+      } catch (e) { console.warn('Activity log failed', e); }
+
+      alert('✅ Catatan berhasil disimpan!');
+      resetForm();
+      await loadNotes();
+    } catch (err) {
+      alert('❌ Gagal menyimpan: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Simpan Catatan';
+    }
+  });
+
+  function resetForm() {
+    document.getElementById('captureForm').reset();
+    currentCategory = null;
+    currentTags = [];
+    currentTodoItems = [];
+    currentPhotoData = null;
+    document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+    renderTodoItems();
+    photoPreview.classList.add('hidden');
+    uploadPlaceholder.classList.remove('hidden');
+    photoUpload.classList.remove('has-photo');
+    document.getElementById('todoOptions').classList.add('hidden');
+    document.getElementById('scheduleOptions').classList.add('hidden');
+  }
+
+  // Load notes
+  async function loadNotes() {
+    const list = document.getElementById('notesList');
+    try {
+      let query = supabaseClient.from('fast_captures').select('*').order('created_at', { ascending: false });
+      if (currentFilter === 'todo') query = query.eq('is_todo', true);
+      if (currentFilter === 'scheduled') query = query.eq('has_schedule', true);
+
+      const { data, error } = await query.limit(50);
+      if (error) throw error;
+
+      document.getElementById('noteCount').textContent = `${data ? data.length : 0} catatan`;
+
+      if (!data || data.length === 0) {
+        list.innerHTML = `<div style="text-align: center; padding: 40px; color: #64748b;">
+          <div style="font-size: 40px; margin-bottom: 8px;">📭</div>
+          <div>Belum ada catatan</div>
+        </div>`;
+        return;
+      }
+
+      list.innerHTML = data.map(n => {
+        const date = new Date(n.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+        const tags = (n.tags || []).map(t => `<span class="meta-chip">#${t}</span>`).join('');
+        const cat = n.category ? `<span class="meta-chip">🏷️ ${n.category}</span>` : '';
+        const todo = n.is_todo ? `<span class="meta-chip">✅ To-Do</span>` : '';
+        const sched = n.has_schedule ? `<span class="meta-chip">⏰ ${n.scheduled_at ? new Date(n.scheduled_at).toLocaleString('id-ID') : 'Dijadwalkan'}</span>` : '';
+        const pic = n.pic ? `<span class="meta-chip">👤 ${n.pic}</span>` : '';
+        return `<div class="note-item">
+          <div class="note-header">
+            <div class="note-title">${escapeHtml(n.title)}</div>
+            <div class="note-time">${date}</div>
+          </div>
+          <div class="note-body">${escapeHtml(n.content)}</div>
+          ${n.photo ? `<img src="${n.photo}" style="max-width: 100%; border-radius: 8px; margin-bottom: 10px;" />` : ''}
+          <div class="note-meta">${cat}${tags}${todo}${sched}${pic}</div>
+        </div>`;
+      }).join('');
+    } catch (err) {
+      list.innerHTML = `<div style="text-align: center; padding: 20px; color: #fca5a5;">Gagal memuat: ${err.message}</div>`;
+    }
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Filter tabs
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentFilter = tab.dataset.filter;
+      loadNotes();
+    });
+  });
+
+  initSupabase();
+</script>
+</body>
+</html>
