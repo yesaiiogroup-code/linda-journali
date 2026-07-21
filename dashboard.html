@@ -614,8 +614,8 @@ const hasSchedule = (c) => c.scheduled_at !== null && c.scheduled_at !== undefin
 
 // ==================== INIT ====================
 async function init() {
-  const url = localStorage.getItem('https://vnuvajqlnvnqyapbmssp.supabase.co');
-  const key = localStorage.getItem('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZudXZhanFsbnZucXlhcGJtc3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDU1NDksImV4cCI6MjA5OTk4MTU0OX0.k6NpZ4-YrB8aYinRSQzMfpCiZdVDsFnWc1LmCcHl1aU');
+  const url = localStorage.getItem('supabase_url') || 'https://vnuvajqlnvnqyapbmssp.supabase.co';
+const key = localStorage.getItem('supabase_anon_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZudXZhanFsbnZucXlhcGJtc3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDU1NDksImV4cCI6MjA5OTk4MTU0OX0.k6NpZ4-YrB8aYinRSQzMfpCiZdVDsFnWc1LmCcHl1aU';
 
   if (!url || !key) {
     document.getElementById('loginOverlay').classList.add('hidden');
