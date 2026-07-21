@@ -607,6 +607,11 @@ function colorFor(name) {
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
+// Helper untuk cek status (menggantikan is_todo dan todo_completed)
+const isActiveTask = (c) => ['Planned', 'In-Progress', 'Waiting on Partner'].includes(c.status);
+const isCompleted = (c) => c.status === 'Completed' || c.status === 'Canceled';
+const hasSchedule = (c) => c.scheduled_at !== null && c.scheduled_at !== undefined;
+
 // ==================== INIT ====================
 async function init() {
   const url = localStorage.getItem('supabase_url');
@@ -752,11 +757,9 @@ create table if not exists fast_captures (
   category text,
   tags text[] default '{}',
   photo text,
-  is_todo boolean default false,
-  todo_completed boolean default false,
+  status text default 'Ideation',
   todo_items jsonb default '[]'::jsonb,
   priority text default 'normal',
-  has_schedule boolean default false,
   scheduled_at timestamptz,
   reminder_type text,
   pic text,
@@ -943,9 +946,9 @@ function toggleSidebar() {
 
 // ==================== STATS ====================
 function updateStats() {
-  const pending = cache.captures.filter(c => (c.is_todo || c.has_schedule) && !c.todo_completed);
-  const done = cache.captures.filter(c => (c.is_todo || c.has_schedule) && c.todo_completed);
-  const activeReminders = cache.captures.filter(c => c.has_schedule && !c.todo_completed);
+  const pending = cache.captures.filter(c => isActiveTask(c));
+  const done = cache.captures.filter(c => isCompleted(c));
+  const activeReminders = cache.captures.filter(c => hasSchedule(c) && !isCompleted(c));
   const todayStr = new Date().toDateString();
   const overdue = pending.filter(c => c.scheduled_at && new Date(c.scheduled_at) < new Date(todayStr));
 
@@ -1055,7 +1058,7 @@ function renderUtang() {
   const weekEnd = new Date();
   weekEnd.setDate(weekEnd.getDate() + 7);
 
-  let items = cache.captures.filter(c => (c.is_todo || c.has_schedule) && !c.todo_completed);
+  let items = cache.captures.filter(c => isActiveTask(c));
 
   if (currentUtangFilter === 'overdue') {
     items = items.filter(c => c.scheduled_at && new Date(c.scheduled_at) < new Date(todayStr));
@@ -1087,7 +1090,7 @@ function renderUtang() {
     const prioBadge = c.priority === 'urgent' ? '<span class="badge badge-red">🔴 Mendesak</span>' : c.priority === 'important' ? '<span class="badge badge-orange">🟠 Penting</span>' : '';
 
     return `<div class="todo-item" style="border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:6px;padding:14px">
-      <input type="checkbox" onchange="toggleTodo('${c.id}')" title="Tandai selesai">
+      <input type="checkbox" onchange="toggleTodo('${c.id}')" title="Tandai selesai" ${isCompleted(c) ? 'checked' : ''}>
       <div class="info">
         <div class="title">${escapeHtml(c.title)}</div>
         <div class="sub">
@@ -1115,7 +1118,7 @@ function renderJadwal() {
   const list = document.getElementById('jadwalList');
   if (!list) return;
   const todayStr = new Date().toDateString();
-  let items = cache.captures.filter(c => c.has_schedule && c.scheduled_at && new Date(c.scheduled_at).toDateString() === todayStr);
+  let items = cache.captures.filter(c => hasSchedule(c) && new Date(c.scheduled_at).toDateString() === todayStr && !isCompleted(c));
   if (currentJadwalFilter !== 'all') items = items.filter(c => c.priority === currentJadwalFilter);
 
   items.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
@@ -1128,8 +1131,8 @@ function renderJadwal() {
   list.innerHTML = items.map(c => {
     const prioBadge = c.priority === 'urgent' ? '<span class="badge badge-red">🔴 Mendesak</span>' : c.priority === 'important' ? '<span class="badge badge-orange">🟠 Penting</span>' : '<span class="badge badge-blue">Normal</span>';
     const time = new Date(c.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    return `<div class="todo-item ${c.todo_completed ? 'done' : ''}" style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;padding:14px">
-      <input type="checkbox" ${c.todo_completed ? 'checked' : ''} onchange="toggleTodo('${c.id}')">
+    return `<div class="todo-item ${isCompleted(c) ? 'done' : ''}" style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;padding:14px">
+      <input type="checkbox" ${isCompleted(c) ? 'checked' : ''} onchange="toggleTodo('${c.id}')">
       <div class="info">
         <div class="title">🕐 ${time} — ${escapeHtml(c.title)}</div>
         <div class="sub">${prioBadge}${c.pic ? '<span>👤 ' + escapeHtml(c.pic) + '</span>' : ''}${c.category ? '<span>' + escapeHtml(c.category) + '</span>' : ''}</div>
@@ -1188,7 +1191,8 @@ function renderNotes() {
       <div class="foot">
         <div>
           ${n.pic ? '<span>👤 ' + escapeHtml(n.pic) + '</span>' : ''}
-          ${n.is_todo ? ' · <span>✅ ' + (n.todo_completed ? 'Selesai' : 'Belum') + '</span>' : ''}
+          ${isActiveTask(n) ? ' · <span>📝 To-Do</span>' : ''}
+          ${isCompleted(n) ? ' · <span>✅ Selesai</span>' : ''}
           ${(n.todo_items && n.todo_items.length) ? ' · <span>📋 ' + n.todo_items.filter(i => i.done).length + '/' + n.todo_items.length + '</span>' : ''}
         </div>
         <span>${formatTime(n.created_at)}</span>
@@ -1206,13 +1210,13 @@ function viewNote(id) {
 // ==================== TODOS ====================
 function renderTodos() {
   const list = document.getElementById('todosList');
-  let items = cache.captures.filter(c => c.is_todo);
+  let items = cache.captures.filter(c => isActiveTask(c) || isCompleted(c));
 
-  if (currentTodosFilter === 'active') items = items.filter(t => !t.todo_completed);
-  else if (currentTodosFilter === 'done') items = items.filter(t => t.todo_completed);
+  if (currentTodosFilter === 'active') items = items.filter(t => !isCompleted(t));
+  else if (currentTodosFilter === 'done') items = items.filter(t => isCompleted(t));
 
   items.sort((a, b) => {
-    if (a.todo_completed !== b.todo_completed) return a.todo_completed ? 1 : -1;
+    if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
     if (!a.scheduled_at) return 1;
     if (!b.scheduled_at) return -1;
     return new Date(a.scheduled_at) - new Date(b.scheduled_at);
@@ -1226,10 +1230,10 @@ function renderTodos() {
   const todayStr = new Date().toDateString();
 
   list.innerHTML = items.map(t => {
-    const isOverdue = !t.todo_completed && t.scheduled_at && new Date(t.scheduled_at) < new Date(todayStr);
+    const isOverdue = !isCompleted(t) && t.scheduled_at && new Date(t.scheduled_at) < new Date(todayStr);
 
-    return `<div class="todo-item ${t.todo_completed ? 'done' : ''}">
-      <input type="checkbox" ${t.todo_completed ? 'checked' : ''} onchange="toggleTodo('${t.id}')">
+    return `<div class="todo-item ${isCompleted(t) ? 'done' : ''}">
+      <input type="checkbox" ${isCompleted(t) ? 'checked' : ''} onchange="toggleTodo('${t.id}')">
       <div class="info">
         <div class="title">${escapeHtml(t.title)}</div>
         <div class="sub">
@@ -1253,16 +1257,22 @@ function filterTodos(filter, el) {
 async function toggleTodo(id) {
   const item = cache.captures.find(c => c.id === id);
   if (!item) return;
-  const newVal = !item.todo_completed;
+  
+  // Jika sudah Completed, kembalikan ke Planned. Jika belum, tandai Completed.
+  const isNowCompleted = isCompleted(item);
+  const newStatus = isNowCompleted ? 'Planned' : 'Completed';
+  
   try {
     const { error } = await supabaseClient.from('fast_captures').update({
-      todo_completed: newVal,
-      completed_at: newVal ? new Date().toISOString() : null
+      status: newStatus,
+      completed_at: !isNowCompleted ? new Date().toISOString() : null
     }).eq('id', id);
     if (error) throw error;
-    item.todo_completed = newVal;
-    item.completed_at = newVal ? new Date().toISOString() : null;
-    await addHistory((newVal ? '✓ Selesai: ' : '↩ Belum: ') + item.title, 'todo', id);
+    
+    item.status = newStatus;
+    item.completed_at = !isNowCompleted ? new Date().toISOString() : null;
+    
+    await addHistory((!isNowCompleted ? '✓ Selesai: ' : '↩ Belum: ') + item.title, 'todo', id);
     renderTodos(); renderUtang(); renderJadwal(); renderReminders(); renderNotes(); updateStats();
   } catch (e) {
     toast('Gagal update: ' + e.message, 'error');
@@ -1284,13 +1294,13 @@ async function toggleTodoItem(noteId, idx) {
 }
 
 async function deleteTodo(id) {
-  if (!confirm('Hapus dari daftar To-Do? (catatan aslinya tidak akan dihapus)')) return;
+  if (!confirm('Hapus dari daftar To-Do? (catatan aslinya akan dikembalikan ke status Ideation)')) return;
   try {
-    const { error } = await supabaseClient.from('fast_captures').update({ is_todo: false }).eq('id', id);
+    const { error } = await supabaseClient.from('fast_captures').update({ status: 'Ideation' }).eq('id', id);
     if (error) throw error;
     const item = cache.captures.find(c => c.id === id);
-    if (item) item.is_todo = false;
-    await addHistory('Dihapus dari To-Do', 'todo', id);
+    if (item) item.status = 'Ideation';
+    await addHistory('Dikembalikan ke Ideation', 'todo', id);
     renderTodos(); renderUtang(); renderJadwal(); updateStats();
     toast('Dihapus dari To-Do', 'success');
   } catch (e) {
@@ -1301,13 +1311,13 @@ async function deleteTodo(id) {
 // ==================== REMINDERS ====================
 function renderReminders() {
   const tbody = document.getElementById('remindersTable');
-  let items = cache.captures.filter(c => c.has_schedule);
+  let items = cache.captures.filter(c => hasSchedule(c));
 
-  if (currentRemindersFilter === 'active') items = items.filter(r => !r.todo_completed);
-  else if (currentRemindersFilter === 'done') items = items.filter(r => r.todo_completed);
+  if (currentRemindersFilter === 'active') items = items.filter(r => !isCompleted(r));
+  else if (currentRemindersFilter === 'done') items = items.filter(r => isCompleted(r));
 
   items.sort((a, b) => {
-    if (a.todo_completed !== b.todo_completed) return a.todo_completed ? 1 : -1;
+    if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
     if (!a.scheduled_at) return 1;
     if (!b.scheduled_at) return -1;
     return new Date(a.scheduled_at) - new Date(b.scheduled_at);
@@ -1319,17 +1329,17 @@ function renderReminders() {
   }
 
   tbody.innerHTML = items.map(r => {
-    const statusClass = r.todo_completed ? 'badge-green' : 'badge-orange';
-    const isPast = !r.todo_completed && r.scheduled_at && new Date(r.scheduled_at) < new Date();
+    const statusClass = isCompleted(r) ? 'badge-green' : 'badge-orange';
+    const isPast = !isCompleted(r) && r.scheduled_at && new Date(r.scheduled_at) < new Date();
 
     return `<tr>
       <td><strong>${escapeHtml(r.title)}</strong></td>
       <td>${r.scheduled_at ? formatDateTime(r.scheduled_at) : '-'}</td>
       <td>${r.reminder_type ? escapeHtml(r.reminder_type) : '-'}</td>
       <td>${(r.tags || []).map(t => `<span class="tag-pill" style="border-left-color:${colorFor(t)}">${escapeHtml(t)}</span>`).join(' ') || '-'}</td>
-      <td><span class="badge ${statusClass}">${r.todo_completed ? 'Selesai' : (isPast ? '<span style="color:var(--red)">Terlewat</span>' : 'Aktif')}</span></td>
+      <td><span class="badge ${statusClass}">${isCompleted(r) ? 'Selesai' : (isPast ? '<span style="color:var(--red)">Terlewat</span>' : 'Aktif')}</span></td>
       <td>
-        <button class="btn-icon" onclick="toggleTodo('${r.id}')" title="${r.todo_completed ? 'Aktifkan' : 'Selesaikan'}"><i class="ri-${r.todo_completed ? 'refresh' : 'check'}-line"></i></button>
+        <button class="btn-icon" onclick="toggleTodo('${r.id}')" title="${isCompleted(r) ? 'Aktifkan' : 'Selesaikan'}"><i class="ri-${isCompleted(r) ? 'refresh' : 'check'}-line"></i></button>
         <button class="btn-icon" onclick="deleteReminder('${r.id}')" title="Hapus"><i class="ri-delete-bin-line"></i></button>
       </td>
     </tr>`;
@@ -1344,12 +1354,15 @@ function filterReminders(filter, el) {
 }
 
 async function deleteReminder(id) {
-  if (!confirm('Hapus reminder ini? (catatan aslinya tidak akan dihapus)')) return;
+  if (!confirm('Hapus reminder ini? (jadwal akan dihapus, catatan tetap ada)')) return;
   try {
-    const { error } = await supabaseClient.from('fast_captures').update({ has_schedule: false }).eq('id', id);
+    const { error } = await supabaseClient.from('fast_captures').update({ scheduled_at: null, reminder_type: null }).eq('id', id);
     if (error) throw error;
     const item = cache.captures.find(c => c.id === id);
-    if (item) item.has_schedule = false;
+    if (item) {
+      item.scheduled_at = null;
+      item.reminder_type = null;
+    }
     await addHistory('Reminder dihapus', 'reminder', id);
     renderReminders(); renderJadwal(); updateStats();
     toast('Reminder dihapus', 'success');
@@ -1678,9 +1691,9 @@ function openModal(type, data = null) {
           <div class="value">${(n.tags && n.tags.length) ? n.tags.map(t => `<span class="tag-pill" style="border-left-color:${colorFor(t)}">${escapeHtml(t)}</span>`).join(' ') : '-'}</div>
         </div>
         ${n.pic ? `<div class="detail-section"><div class="label">PIC</div><div class="value">👤 ${escapeHtml(n.pic)}</div></div>` : ''}
-        ${n.is_todo ? `<div class="detail-section"><div class="label">To-Do</div><div class="value"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${n.todo_completed ? 'checked' : ''} onchange="toggleTodo('${n.id}');closeModal()"><span>${n.todo_completed ? 'Selesai' : 'Belum selesai'}</span></label></div></div>` : ''}
+        ${isActiveTask(n) || isCompleted(n) ? `<div class="detail-section"><div class="label">To-Do</div><div class="value"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${isCompleted(n) ? 'checked' : ''} onchange="toggleTodo('${n.id}');closeModal()"><span>${isCompleted(n) ? 'Selesai' : 'Belum selesai'}</span></label></div></div>` : ''}
         ${(n.todo_items && n.todo_items.length) ? `<div class="detail-section"><div class="label">Checklist (${n.todo_items.filter(i => i.done).length}/${n.todo_items.length})</div><div class="value">${n.todo_items.map((item, idx) => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer"><input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleTodoItem('${n.id}', ${idx})"><span style="${item.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(item.text)}</span></label>`).join('')}</div></div>` : ''}
-        ${n.has_schedule ? `<div class="detail-section"><div class="label">Jadwal & Prioritas</div><div class="value">${n.scheduled_at ? formatDateTime(n.scheduled_at) : '-'} ${prioBadge}</div></div>` : ''}
+        ${hasSchedule(n) ? `<div class="detail-section"><div class="label">Jadwal & Prioritas</div><div class="value">${formatDateTime(n.scheduled_at)} ${prioBadge}</div></div>` : ''}
         <div class="detail-section">
           <div class="label">Dibuat</div>
           <div class="value">${formatTime(n.created_at)}</div>
@@ -1900,7 +1913,7 @@ async function saveNorthStar() {
 function exportCSV() {
   let csv = 'Type,Title,Detail,Date\n';
   cache.captures.forEach(n => {
-    const type = n.is_todo ? 'todo' : (n.has_schedule ? 'reminder' : 'note');
+    const type = isActiveTask(n) ? 'todo' : (hasSchedule(n) ? 'reminder' : 'note');
     csv += `"${type}","${(n.title || '').replace(/"/g, '""')}","${(n.content || '').substring(0, 100).replace(/"/g, '""')}","${n.created_at}"\n`;
   });
   downloadFile(csv, 'second-brain-history.csv', 'text/csv');
@@ -1976,7 +1989,6 @@ function toast(msg, type = 'info') {
 
 // ==================== START ====================
 init();
-
 </script>
 </body>
 </html>
