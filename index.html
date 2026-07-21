@@ -450,7 +450,7 @@
       scheduledAt = scheduleTime ? `${scheduleDate}T${scheduleTime}:00` : `${scheduleDate}T00:00:00`;
     }
 
-    // PAYLOAD BARU: Integrasi Status operasional
+    // PAYLOAD BERSIH: Bebas dari kolom lama yang sudah dihapus di Supabase
     const payload = {
       title,
       content,
@@ -458,7 +458,7 @@
       tags: currentTags,
       photo: currentPhotoData,
       is_todo: isTodo,
-      status: isTodo ? 'Planned' : 'Ideation', // Fase rencana otomatis
+      status: isTodo ? 'Planned' : 'Ideation',
       todo_items: isTodo ? currentTodoItems : [],
       priority,
       scheduled_at: scheduledAt,
@@ -478,7 +478,9 @@
           title: `Catatan baru: ${title}`,
           created_at: new Date().toISOString()
         }]);
-      } catch (e) { console.warn('Activity log failed', e); }
+      } catch (errActivity) { 
+        console.warn('Activity log failed', errActivity); 
+      }
 
       alert('✅ Rencana operasional berhasil diamankan!');
       resetForm();
