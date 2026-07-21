@@ -459,7 +459,6 @@
       todo_completed: false,
       todo_items: isTodo ? currentTodoItems : [],
       priority,
-      has_schedule: hasSchedule,
       scheduled_at: scheduledAt,
       reminder_type: reminderType || null,
       pic: pic || null,
@@ -511,7 +510,7 @@
     try {
       let query = supabaseClient.from('fast_captures').select('*').order('created_at', { ascending: false });
       if (currentFilter === 'todo') query = query.eq('is_todo', true);
-      if (currentFilter === 'scheduled') query = query.eq('has_schedule', true);
+      if (currentFilter === 'scheduled') query = query.not('scheduled_at', 'is', null);
 
       const { data, error } = await query.limit(50);
       if (error) throw error;
@@ -531,7 +530,7 @@
         const tags = (n.tags || []).map(t => `<span class="meta-chip">#${t}</span>`).join('');
         const cat = n.category ? `<span class="meta-chip">🏷️ ${n.category}</span>` : '';
         const todo = n.is_todo ? `<span class="meta-chip">✅ To-Do</span>` : '';
-        const sched = n.has_schedule ? `<span class="meta-chip">⏰ ${n.scheduled_at ? new Date(n.scheduled_at).toLocaleString('id-ID') : 'Dijadwalkan'}</span>` : '';
+        const sched = n.scheduled_at ? `<span class="meta-chip">⏰ ${new Date(n.scheduled_at).toLocaleString('id-ID')}</span>` : '';
         const pic = n.pic ? `<span class="meta-chip">👤 ${n.pic}</span>` : '';
         return `<div class="note-item">
           <div class="note-header">
