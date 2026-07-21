@@ -271,8 +271,8 @@
   }
 
   async function initSupabase() {
-    const url = localStorage.getItem('supabase_url');
-    const key = localStorage.getItem('supabase_anon_key');
+    const url = localStorage.getItem('https://vnuvajqlnvnqyapbmssp.supabase.co');
+    const key = localStorage.getItem('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZudXZhanFsbnZucXlhcGJtc3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDU1NDksImV4cCI6MjA5OTk4MTU0OX0.k6NpZ4-YrB8aYinRSQzMfpCiZdVDsFnWc1LmCcHl1aU');
 
     if (!url || !key) {
       setStatus('error', 'Supabase belum dikonfigurasi. Buka Dashboard untuk setup.');
